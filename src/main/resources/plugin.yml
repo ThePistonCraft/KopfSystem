@@ -1,0 +1,7 @@
+name: KopfSystem
+version: 1.0
+api-version: 1.29
+author: einCode_
+main: de.maxcode.kopf.KopfSystem
+commands:
+  kopf:
