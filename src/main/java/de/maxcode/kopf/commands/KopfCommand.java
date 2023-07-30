@@ -16,12 +16,13 @@ import org.jetbrains.annotations.NotNull;
 import java.io.File;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
+import java.util.Arrays;
 import java.util.Date;
 
 public class KopfCommand
         implements CommandExecutor {
 
-    private final File file = new File("plugins//" + KopfSystem.getInstance().getDataFolder() + "/heads.yml");
+    private final File file = new File("plugins//KopfSystem/heads.yml");
     private final YamlConfiguration yamlConfiguration = YamlConfiguration.loadConfiguration(file);
 
     @Override
@@ -39,6 +40,11 @@ public class KopfCommand
             return true;
         }
 
+        if (invFull(player)) {
+            player.sendMessage(KopfSystem.getInstance().getPrefix() + "§cDu hast nicht genug Platz in deinem Inventar.");
+            return true;
+        }
+
         if (!player.hasPermission("kopfsystem.bypass")) {
             if (this.yamlConfiguration.getLong(player.getUniqueId().toString()) < System.currentTimeMillis()) {
                 this.yamlConfiguration.set(player.getUniqueId().toString(), null);
@@ -49,7 +55,7 @@ public class KopfCommand
             }
             if (this.yamlConfiguration.get(player.getUniqueId().toString()) == null) {
                 OfflinePlayer target = Bukkit.getOfflinePlayer(args[0]);
-                player.getInventory().addItem(giveHead(target.getName()));
+                getPlayerHead(player, target.getName(), "§8» §7Kopf von §e" + target.getName());
 
                 int time = 0;
                 time = Integer.parseInt(String.valueOf(KopfSystem.getInstance().getConfig().getInt("HeadWaitTime")));
@@ -69,7 +75,7 @@ public class KopfCommand
         }
         OfflinePlayer target = Bukkit.getOfflinePlayer(args[0]);
 
-        player.getInventory().addItem(giveHead(target.getName()));
+        getPlayerHead(player, target.getName(), "§8» §7Kopf von §e" + target.getName());
         player.sendMessage(KopfSystem.getInstance().getPrefix() + "Du hast den Kopf von §e" + target.getName() + " §7erhalten!");
         return false;
     }
@@ -81,13 +87,43 @@ public class KopfCommand
         } catch (IOException ignored) {  };
     }
 
-    public ItemStack giveHead(String targetName) {
-        ItemStack itemStack = new ItemStack(Material.LEGACY_SKULL_ITEM, 1, (short) 3);
-        SkullMeta skullMeta = (SkullMeta) itemStack.getItemMeta();
-        skullMeta.setDisplayName("§8» §7Kopf von §e" + targetName);
-        skullMeta.setOwner(targetName);
-        itemStack.setItemMeta(skullMeta);
+    private static void getPlayerHead(Player player, String headName, String displayName) {
+        ItemStack headItem = createPlayerHead(headName, displayName);
 
-        return itemStack;
+        for (ItemStack item : player.getInventory().getContents()) {
+            if (item == null || item.getType() != Material.PLAYER_HEAD) continue;
+
+            SkullMeta skullMeta = (SkullMeta) item.getItemMeta();
+            if (skullMeta == null) continue;
+
+            String itemHeadName = skullMeta.getOwner();
+            if (itemHeadName != null && itemHeadName.equals(headName)) {
+                int remainingSpace = item.getMaxStackSize() - item.getAmount();
+                if (remainingSpace > 0) {
+                    int amountToAdd = Math.min(remainingSpace, headItem.getAmount());
+                    item.setAmount(item.getAmount() + amountToAdd);
+                    headItem.setAmount(headItem.getAmount() - amountToAdd);
+                    if (headItem.getAmount() == 0) return;
+                }
+            }
+        }
+        player.getInventory().addItem(headItem);
+    }
+
+    private static ItemStack createPlayerHead(String playerName, String displayName) {
+        ItemStack headItem = new ItemStack(Material.PLAYER_HEAD);
+        SkullMeta skullMeta = (SkullMeta) headItem.getItemMeta();
+        if (skullMeta != null) {
+            skullMeta.setOwningPlayer(Bukkit.getOfflinePlayer(playerName));
+            if (displayName != null && !displayName.isEmpty()) {
+                skullMeta.setDisplayName(displayName);
+            }
+            headItem.setItemMeta(skullMeta);
+        }
+        return headItem;
+    }
+
+    private boolean invFull(Player player) {
+        return !Arrays.asList(player.getInventory().getStorageContents()).contains(null);
     }
 }
